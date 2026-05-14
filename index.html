@@ -238,6 +238,18 @@ function renderHistory(){
   }).join('');
 }
 
+window.applyFirestoreRecordsToScreen = function(records) {
+  history = Array.isArray(records) ? records : [];
+
+  totalPoints = history.reduce((sum, record) => {
+    return sum + (Number(record.pts) || 0);
+  }, 0);
+
+  save();
+  updatePointsDisplay();
+  renderHistory();
+};
+
 function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -420,6 +432,9 @@ drawRoulette(currentAngle);
     getFirestore,
     collection,
     addDoc,
+    getDocs,
+    query,
+    orderBy,
     serverTimestamp
   } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
@@ -437,7 +452,46 @@ drawRoulette(currentAngle);
   const auth = getAuth(app);
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
+async function loadSleepRecordsFromFirestore() {
+    if (!currentUser) {
+      return [];
+    }
 
+    const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
+    const q = query(recordsRef, orderBy("created_at", "asc"));
+    const snapshot = await getDocs(q);
+
+    const records = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+
+      // 接続確認用のテストデータは、履歴画面には表示しない
+      if (data.memo === "Firebase接続テスト") {
+        return;
+      }
+
+      const totalMins =
+        Number(data.total_minutes) ||
+        Math.round(Number(data.sleep_hours || 0) * 60);
+
+      if (!totalMins) {
+        return;
+      }
+
+      const pts =
+        Number(data.points) ||
+        (totalMins >= 360 ? 12 : Math.round((totalMins / 360) * 10));
+
+      records.push({
+        date: data.display_date || data.record_date || "",
+        mins: totalMins,
+        pts: pts
+      });
+    });
+
+    return records;
+  }
   const loginButton = document.getElementById("loginButton");
   const logoutButton = document.getElementById("logoutButton");
   const loginStatus = document.getElementById("loginStatus");
@@ -463,14 +517,29 @@ drawRoulette(currentAngle);
     }
   });
 
-  onAuthStateChanged(auth, (user) => {
+ onAuthStateChanged(auth, async (user) => {
     currentUser = user;
 
     if (user) {
-      loginStatus.textContent = "ログイン中: " + user.email;
+      loginStatus.textContent = "ログイン中: " + user.email + "（履歴を読み込み中...）";
       loginButton.style.display = "none";
       logoutButton.style.display = "inline-block";
       testSaveButton.style.display = "inline-block";
+
+      try {
+        const records = await loadSleepRecordsFromFirestore();
+
+        if (window.applyFirestoreRecordsToScreen) {
+          window.applyFirestoreRecordsToScreen(records);
+        }
+
+        loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み済み）";
+      } catch (error) {
+        console.error(error);
+        loginStatus.textContent = "ログイン中: " + user.email;
+        alert("Firestoreから履歴を読み込めませんでした: " + error.message);
+      }
+
     } else {
       loginStatus.textContent = "未ログインです";
       loginButton.style.display = "inline-block";
