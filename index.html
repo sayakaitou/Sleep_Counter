@@ -250,23 +250,67 @@ document.getElementById('h-down').addEventListener('click',()=>{hours=(hours-1+2
 document.getElementById('m-up').addEventListener('click',()=>{mins=(mins+5)%60;updateTimeDisplay()});
 document.getElementById('m-down').addEventListener('click',()=>{mins=(mins-5+60)%60;updateTimeDisplay()});
 
-document.getElementById('record-btn').addEventListener('click',()=>{
-  const totalMins = hours*60+mins;
-  if(!totalMins){showToast('睡眠時間を入力してください');return;}
+document.getElementById('record-btn').addEventListener('click', async () => {
+  const user = window.getCurrentFirebaseUser ? window.getCurrentFirebaseUser() : null;
+
+  if (!user) {
+    alert('先にGoogleでログインしてください。');
+    return;
+  }
+
+  const totalMins = hours * 60 + mins;
+
+  if (!totalMins) {
+    showToast('睡眠時間を入力してください');
+    return;
+  }
+
   const pts = calcPoints(totalMins);
   const prev = totalPoints;
-  totalPoints += pts;
   const now = new Date();
-  history.push({
-    date:(now.getMonth()+1)+'/'+(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes()),
-    mins:totalMins, pts
-  });
-  save();
-  updatePointsDisplay();
-  renderHistory();
-  showToast('+'+pts+'ポイント獲得！');
-  if(Math.floor(totalPoints/100) > Math.floor(prev/100)){
-    setTimeout(openModal, 700);
+
+  const displayDate =
+    (now.getMonth() + 1) + '/' + now.getDate() + ' ' +
+    pad(now.getHours()) + ':' + pad(now.getMinutes());
+
+  const localRecord = {
+    date: displayDate,
+    mins: totalMins,
+    pts: pts
+  };
+
+  const firestoreRecord = {
+    record_date: now.toISOString().slice(0, 10),
+    display_date: displayDate,
+    hours: hours,
+    minutes: mins,
+    total_minutes: totalMins,
+    sleep_hours: Math.round((totalMins / 60) * 100) / 100,
+    points: pts
+  };
+
+  try {
+    if (!window.saveSleepRecordToFirestore) {
+      throw new Error('Firebase保存処理がまだ準備できていません');
+    }
+
+    await window.saveSleepRecordToFirestore(firestoreRecord);
+
+    totalPoints += pts;
+    history.push(localRecord);
+
+    save();
+    updatePointsDisplay();
+    renderHistory();
+
+    showToast('+' + pts + 'ポイント獲得！Firestoreにも保存しました');
+
+    if (Math.floor(totalPoints / 100) > Math.floor(prev / 100)) {
+      setTimeout(openModal, 700);
+    }
+  } catch (error) {
+    console.error(error);
+    alert('Firestoreへの保存に失敗しました: ' + error.message);
   }
 });
 
@@ -434,6 +478,21 @@ drawRoulette(currentAngle);
       testSaveButton.style.display = "none";
     }
   });
+  window.getCurrentFirebaseUser = () => currentUser;
+
+window.saveSleepRecordToFirestore = async (record) => {
+  if (!currentUser) {
+    throw new Error("ログインしていません");
+  }
+
+  await addDoc(
+    collection(db, "users", currentUser.uid, "sleep_records"),
+    {
+      ...record,
+      created_at: serverTimestamp()
+    }
+  );
+};
 
   testSaveButton.addEventListener("click", async () => {
     if (!currentUser) {
