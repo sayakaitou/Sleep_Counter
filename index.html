@@ -82,6 +82,7 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
 .reset-btn:active{background:var(--soft)}
 </style>
 </head>
+
 <body>
 <div class="wrap">
 
@@ -89,6 +90,7 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
     <h1>睡眠記録 &amp; ご褒美ポイント</h1>
     <p>目標：6時間 ／ 100ポイントでルーレット</p>
   </div>
+
   <div class="card">
     <div class="card-title">ログイン状態</div>
     <button class="record-btn" id="loginButton">Googleでログイン</button>
@@ -213,6 +215,7 @@ function updatePointsDisplay(){
   document.getElementById('prog-fill').style.width = inCycle+'%';
   document.getElementById('prog-label').textContent = inCycle+' / 100 ポイント';
   document.getElementById('point-arc').style.strokeDashoffset = 201 - (201 * inCycle / 100);
+
   if(inCycle === 0 && totalPoints > 0){
     document.getElementById('next-label').textContent = '達成！ルーレットを回そう';
   } else {
@@ -222,13 +225,17 @@ function updatePointsDisplay(){
 
 function renderHistory(){
   const el = document.getElementById('history-list');
+
   if(!history.length){
     el.innerHTML = '<div class="empty-msg">まだ記録がありません</div>';
     return;
   }
+
   el.innerHTML = history.slice().reverse().map(h=>{
     const pct = Math.min(h.mins/GOAL_MINS,1)*100;
-    const hr = Math.floor(h.mins/60), mn = h.mins%60;
+    const hr = Math.floor(h.mins/60);
+    const mn = h.mins%60;
+
     return `<div class="hist-item">
       <span class="hist-date">${h.date}</span>
       <span class="hist-time">${pad(hr)}:${pad(mn)}</span>
@@ -257,10 +264,25 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),2000);
 }
 
-document.getElementById('h-up').addEventListener('click',()=>{hours=(hours+1)%25;updateTimeDisplay()});
-document.getElementById('h-down').addEventListener('click',()=>{hours=(hours-1+25)%25;updateTimeDisplay()});
-document.getElementById('m-up').addEventListener('click',()=>{mins=(mins+5)%60;updateTimeDisplay()});
-document.getElementById('m-down').addEventListener('click',()=>{mins=(mins-5+60)%60;updateTimeDisplay()});
+document.getElementById('h-up').addEventListener('click',()=>{
+  hours=(hours+1)%25;
+  updateTimeDisplay();
+});
+
+document.getElementById('h-down').addEventListener('click',()=>{
+  hours=(hours-1+25)%25;
+  updateTimeDisplay();
+});
+
+document.getElementById('m-up').addEventListener('click',()=>{
+  mins=(mins+5)%60;
+  updateTimeDisplay();
+});
+
+document.getElementById('m-down').addEventListener('click',()=>{
+  mins=(mins-5+60)%60;
+  updateTimeDisplay();
+});
 
 document.getElementById('record-btn').addEventListener('click', async () => {
   const user = window.getCurrentFirebaseUser ? window.getCurrentFirebaseUser() : null;
@@ -317,7 +339,7 @@ document.getElementById('record-btn').addEventListener('click', async () => {
 
     showToast('+' + pts + 'ポイント獲得！Firestoreにも保存しました');
 
-    if (Math.floor(totalPoints / 100) > Math.floor(prev / 100)) {
+    if (Math.floor(totalPoints/100) > Math.floor(prev/100)) {
       setTimeout(openModal, 700);
     }
   } catch (error) {
@@ -328,12 +350,18 @@ document.getElementById('record-btn').addEventListener('click', async () => {
 
 document.getElementById('reset-btn').addEventListener('click',()=>{
   if(!confirm('記録とポイントをすべてリセットしますか？')) return;
-  totalPoints = 0; history = []; currentAngle = 0;
+
+  totalPoints = 0;
+  history = [];
+  currentAngle = 0;
+
   save();
   updatePointsDisplay();
   renderHistory();
   drawRoulette(0);
   showToast('リセットしました');
+
+  alert('画面上のデータをリセットしました。Firestore上の過去データ削除は次の段階で対応します。');
 });
 
 function drawRoulette(angle){
@@ -341,28 +369,55 @@ function drawRoulette(angle){
   const ctx = canvas.getContext('2d');
   const cx=110, cy=110, r=104;
   ctx.clearRect(0,0,220,220);
+
   const slice = (Math.PI*2)/N;
+
   for(let i=0;i<N;i++){
-    const s = angle+slice*i, e = angle+slice*(i+1);
-    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,s,e);ctx.closePath();
-    ctx.fillStyle=COLORS[i];ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.6)';ctx.lineWidth=2;ctx.stroke();
+    const s = angle+slice*i;
+    const e = angle+slice*(i+1);
+
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,s,e);
+    ctx.closePath();
+    ctx.fillStyle=COLORS[i];
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.6)';
+    ctx.lineWidth=2;
+    ctx.stroke();
+
     const mid = angle+slice*i+slice/2;
-    const tx = cx+(r*0.65)*Math.cos(mid), ty = cy+(r*0.65)*Math.sin(mid);
-    ctx.save();ctx.translate(tx,ty);ctx.rotate(mid+Math.PI/2);
-    ctx.fillStyle='#fff';ctx.font='bold 10px -apple-system,sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';
+    const tx = cx+(r*0.65)*Math.cos(mid);
+    const ty = cy+(r*0.65)*Math.sin(mid);
+
+    ctx.save();
+    ctx.translate(tx,ty);
+    ctx.rotate(mid+Math.PI/2);
+    ctx.fillStyle='#fff';
+    ctx.font='bold 10px -apple-system,sans-serif';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+
     const label = REWARDS[i];
+
     if(label.length>7){
       const h2=Math.ceil(label.length/2);
-      ctx.fillText(label.slice(0,h2),0,-7);ctx.fillText(label.slice(h2),0,7);
-    } else {ctx.fillText(label,0,0);}
+      ctx.fillText(label.slice(0,h2),0,-7);
+      ctx.fillText(label.slice(h2),0,7);
+    } else {
+      ctx.fillText(label,0,0);
+    }
+
     ctx.restore();
   }
-  ctx.beginPath();ctx.arc(cx,cy,15,0,Math.PI*2);
-  ctx.fillStyle='#fff';ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(cx,cy,15,0,Math.PI*2);
+  ctx.fillStyle='#fff';
+  ctx.fill();
   ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--border').trim()||'#b8dfd0';
-  ctx.lineWidth=2;ctx.stroke();
+  ctx.lineWidth=2;
+  ctx.stroke();
 }
 
 function getWinnerIndex(finalAngle){
@@ -374,42 +429,63 @@ function getWinnerIndex(finalAngle){
 
 function openModal(){
   document.getElementById('modal').classList.add('open');
+
   const rt=document.getElementById('result-text');
-  rt.style.display='none';rt.textContent='';
+  rt.style.display='none';
+  rt.textContent='';
+
   document.getElementById('spin-btn').disabled=false;
   drawRoulette(currentAngle);
 }
 
 document.getElementById('close-modal').addEventListener('click',()=>{
   document.getElementById('modal').classList.remove('open');
-  if(totalPoints%100!==0){totalPoints=Math.floor(totalPoints/100)*100;save();updatePointsDisplay();}
+
+  if(totalPoints%100!==0){
+    totalPoints=Math.floor(totalPoints/100)*100;
+    save();
+    updatePointsDisplay();
+  }
 });
 
 document.getElementById('spin-btn').addEventListener('click',()=>{
   if(spinning) return;
+
   spinning=true;
   document.getElementById('spin-btn').disabled=true;
+
   const rt=document.getElementById('result-text');
   rt.style.display='none';
+
   const totalRot=Math.PI*2*(6+Math.random()*3)+Math.random()*Math.PI*2;
   const finalAngle=(currentAngle+totalRot)%(Math.PI*2);
   let start=null;
   const dur=4500;
+
   function animate(ts){
     if(!start) start=ts;
+
     const p=Math.min((ts-start)/dur,1);
     const ease=1-Math.pow(1-p,4);
+
     drawRoulette(currentAngle+ease*totalRot);
-    if(p<1){requestAnimationFrame(animate);}
-    else{
-      currentAngle=finalAngle;spinning=false;
+
+    if(p<1){
+      requestAnimationFrame(animate);
+    } else {
+      currentAngle=finalAngle;
+      spinning=false;
+
       const idx=getWinnerIndex(currentAngle);
       rt.textContent=REWARDS[idx]+' が当たり！';
       rt.style.display='block';
+
       totalPoints=totalPoints%100;
-      save();updatePointsDisplay();
+      save();
+      updatePointsDisplay();
     }
   }
+
   requestAnimationFrame(animate);
 });
 
@@ -419,8 +495,10 @@ updatePointsDisplay();
 renderHistory();
 drawRoulette(currentAngle);
 </script>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+
   import {
     getAuth,
     GoogleAuthProvider,
@@ -428,14 +506,15 @@ drawRoulette(currentAngle);
     signOut,
     onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
- import {
-  getFirestore,
-  collection,
-  addDoc,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
-  // ここをFirebase Consoleに表示されている内容に差し替えます
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    getDocs,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
   const firebaseConfig = {
     apiKey: "AIzaSyDTt2VSB6hUH3zGdqtJ8gt2r1L1Vh0R5Xk",
     authDomain: "sleep-counter-1f8f1.firebaseapp.com",
@@ -449,51 +528,65 @@ drawRoulette(currentAngle);
   const auth = getAuth(app);
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
-async function loadSleepRecordsFromFirestore() {
-  if (!currentUser) {
-    return [];
-  }
 
-  const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
-  const q = query(recordsRef, orderBy("created_at", "asc"));
-  const snapshot = await getDocs(q);
-
-  const records = [];
-
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-
-    if (data.memo === "Firebase接続テスト") {
-      return;
-    }
-
-    const totalMins =
-      Number(data.total_minutes) ||
-      Math.round(Number(data.sleep_hours || 0) * 60);
-
-    if (!totalMins) {
-      return;
-    }
-
-    const pts =
-      Number(data.points) ||
-      (totalMins >= 360 ? 12 : Math.round((totalMins / 360) * 10));
-
-    records.push({
-      date: data.display_date || data.record_date || "",
-      mins: totalMins,
-      pts: pts
-    });
-  });
-
-  return records;
-}
   const loginButton = document.getElementById("loginButton");
   const logoutButton = document.getElementById("logoutButton");
   const loginStatus = document.getElementById("loginStatus");
   const testSaveButton = document.getElementById("testSaveButton");
 
   let currentUser = null;
+
+  async function loadSleepRecordsFromFirestore() {
+    if (!currentUser) {
+      return [];
+    }
+
+    const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
+    const snapshot = await getDocs(recordsRef);
+
+    const records = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+
+      if (data.memo === "Firebase接続テスト") {
+        return;
+      }
+
+      const totalMins =
+        Number(data.total_minutes) ||
+        Math.round(Number(data.sleep_hours || 0) * 60);
+
+      if (!totalMins) {
+        return;
+      }
+
+      const pts =
+        Number(data.points) ||
+        (totalMins >= 360 ? 12 : Math.round((totalMins / 360) * 10));
+
+      let createdMs = 0;
+
+      if (data.created_at && typeof data.created_at.toMillis === "function") {
+        createdMs = data.created_at.toMillis();
+      }
+
+      records.push({
+        date: data.display_date || data.record_date || "",
+        mins: totalMins,
+        pts: pts,
+        createdMs: createdMs
+      });
+    });
+
+    records.sort((a, b) => a.createdMs - b.createdMs);
+
+    return records.map((record) => ({
+      date: record.date,
+      mins: record.mins,
+      pts: record.pts
+    }));
+  }
 
   loginButton.addEventListener("click", async () => {
     try {
@@ -513,8 +606,9 @@ async function loadSleepRecordsFromFirestore() {
     }
   });
 
- onAuthStateChanged(auth, async (user) => {
+  onAuthStateChanged(auth, async (user) => {
     currentUser = user;
+    window.getCurrentFirebaseUser = () => currentUser;
 
     if (user) {
       loginStatus.textContent = "ログイン中: " + user.email + "（履歴を読み込み中...）";
@@ -532,8 +626,12 @@ async function loadSleepRecordsFromFirestore() {
         loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み済み）";
       } catch (error) {
         console.error(error);
-        loginStatus.textContent = "ログイン中: " + user.email;
-        alert("Firestoreから履歴を読み込めませんでした: " + error.message);
+        loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み失敗）";
+        alert(
+          "Firestoreから履歴を読み込めませんでした。\n\n" +
+          "エラーコード: " + (error.code || "なし") + "\n" +
+          "内容: " + error.message
+        );
       }
 
     } else {
@@ -541,23 +639,26 @@ async function loadSleepRecordsFromFirestore() {
       loginButton.style.display = "inline-block";
       logoutButton.style.display = "none";
       testSaveButton.style.display = "none";
+      currentUser = null;
+      window.getCurrentFirebaseUser = () => null;
     }
   });
+
   window.getCurrentFirebaseUser = () => currentUser;
 
-window.saveSleepRecordToFirestore = async (record) => {
-  if (!currentUser) {
-    throw new Error("ログインしていません");
-  }
-
-  await addDoc(
-    collection(db, "users", currentUser.uid, "sleep_records"),
-    {
-      ...record,
-      created_at: serverTimestamp()
+  window.saveSleepRecordToFirestore = async (record) => {
+    if (!currentUser) {
+      throw new Error("ログインしていません");
     }
-  );
-};
+
+    await addDoc(
+      collection(db, "users", currentUser.uid, "sleep_records"),
+      {
+        ...record,
+        created_at: serverTimestamp()
+      }
+    );
+  };
 
   testSaveButton.addEventListener("click", async () => {
     if (!currentUser) {
