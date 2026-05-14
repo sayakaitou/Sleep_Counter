@@ -80,6 +80,28 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
 
 .reset-btn{width:100%;background:none;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:12px;color:var(--muted);cursor:pointer;font-family:inherit;margin-top:6px}
 .reset-btn:active{background:var(--soft)}
+
+.date-row{
+  margin-bottom:12px;
+}
+.date-label{
+  display:block;
+  font-size:12px;
+  color:var(--muted);
+  font-weight:700;
+  margin-bottom:6px;
+}
+.date-input{
+  width:100%;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 12px;
+  font-size:16px;
+  color:var(--text);
+  background:#fff;
+  font-family:inherit;
+}
+
 </style>
 </head>
 
@@ -98,9 +120,15 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
     <p id="loginStatus" style="font-size:13px;color:#5a8a7a;margin-top:8px;">未ログインです</p>
   </div>
 
-  <div class="card">
-    <div class="card-title">今日の睡眠時間を記録</div>
-    <div class="time-row">
+<div class="card">
+  <div class="card-title">睡眠時間を記録</div>
+
+  <div class="date-row">
+    <label class="date-label" for="record-date">記録する日付</label>
+    <input class="date-input" type="date" id="record-date">
+  </div>
+
+  <div class="time-row">
       <div class="spinner">
         <button class="spin-btn" id="h-up">▲</button>
         <div class="spin-val" id="h-val">07</div>
@@ -184,6 +212,24 @@ let spinning = false;
 let currentAngle = 0;
 
 function pad(n){return String(n).padStart(2,'0')}
+
+function localDateValue(date){
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+}
+
+function displayDateFromValue(value){
+  if(!value) return '';
+  const parts = value.split('-');
+  if(parts.length !== 3) return value;
+  return Number(parts[1]) + '/' + Number(parts[2]);
+}
+
+function setDefaultRecordDate(){
+  const el = document.getElementById('record-date');
+  if(el && !el.value){
+    el.value = localDateValue(new Date());
+  }
+}
 
 function save(){
   localStorage.setItem(LS_KEY, JSON.stringify({totalPoints, history, currentAngle}));
@@ -318,11 +364,10 @@ document.getElementById('record-btn').addEventListener('click', async () => {
 
   const pts = calcPoints(totalMins);
   const prev = totalPoints;
-  const now = new Date();
-
-  const displayDate =
-    (now.getMonth() + 1) + '/' + now.getDate() + ' ' +
-    pad(now.getHours()) + ':' + pad(now.getMinutes());
+const now = new Date();
+const dateInput = document.getElementById('record-date');
+const selectedDate = dateInput && dateInput.value ? dateInput.value : localDateValue(now);
+const displayDate = displayDateFromValue(selectedDate);
 
   const localRecord = {
     date: displayDate,
@@ -330,15 +375,15 @@ document.getElementById('record-btn').addEventListener('click', async () => {
     pts: pts
   };
 
-  const firestoreRecord = {
-    record_date: now.toISOString().slice(0, 10),
-    display_date: displayDate,
-    hours: hours,
-    minutes: mins,
-    total_minutes: totalMins,
-    sleep_hours: Math.round((totalMins / 60) * 100) / 100,
-    points: pts
-  };
+const firestoreRecord = {
+  record_date: selectedDate,
+  display_date: displayDate,
+  hours: hours,
+  minutes: mins,
+  total_minutes: totalMins,
+  sleep_hours: Math.round((totalMins / 60) * 100) / 100,
+  points: pts
+};
 
   try {
     if (!window.saveSleepRecordToFirestore) {
@@ -546,6 +591,7 @@ if (window.saveAppStateToFirestore) {
 });
 
 load();
+setDefaultRecordDate();
 updateTimeDisplay();
 updatePointsDisplay();
 renderHistory();
