@@ -428,15 +428,12 @@ drawRoulette(currentAngle);
     signOut,
     onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
-  import {
-    getFirestore,
-    collection,
-    addDoc,
-    getDocs,
-    query,
-    orderBy,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+ import {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
   // ここをFirebase Consoleに表示されている内容に差し替えます
   const firebaseConfig = {
@@ -453,45 +450,44 @@ drawRoulette(currentAngle);
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
 async function loadSleepRecordsFromFirestore() {
-    if (!currentUser) {
-      return [];
+  if (!currentUser) {
+    return [];
+  }
+
+  const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
+  const q = query(recordsRef, orderBy("created_at", "asc"));
+  const snapshot = await getDocs(q);
+
+  const records = [];
+
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+
+    if (data.memo === "Firebase接続テスト") {
+      return;
     }
 
-    const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
-    const q = query(recordsRef, orderBy("created_at", "asc"));
-    const snapshot = await getDocs(q);
+    const totalMins =
+      Number(data.total_minutes) ||
+      Math.round(Number(data.sleep_hours || 0) * 60);
 
-    const records = [];
+    if (!totalMins) {
+      return;
+    }
 
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
+    const pts =
+      Number(data.points) ||
+      (totalMins >= 360 ? 12 : Math.round((totalMins / 360) * 10));
 
-      // 接続確認用のテストデータは、履歴画面には表示しない
-      if (data.memo === "Firebase接続テスト") {
-        return;
-      }
-
-      const totalMins =
-        Number(data.total_minutes) ||
-        Math.round(Number(data.sleep_hours || 0) * 60);
-
-      if (!totalMins) {
-        return;
-      }
-
-      const pts =
-        Number(data.points) ||
-        (totalMins >= 360 ? 12 : Math.round((totalMins / 360) * 10));
-
-      records.push({
-        date: data.display_date || data.record_date || "",
-        mins: totalMins,
-        pts: pts
-      });
+    records.push({
+      date: data.display_date || data.record_date || "",
+      mins: totalMins,
+      pts: pts
     });
+  });
 
-    return records;
-  }
+  return records;
+}
   const loginButton = document.getElementById("loginButton");
   const logoutButton = document.getElementById("logoutButton");
   const loginStatus = document.getElementById("loginStatus");
