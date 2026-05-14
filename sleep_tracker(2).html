@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="睡眠記録">
+<title>睡眠記録 &amp; ご褒美</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f0f9f4;--card:#ffffff;--border:#b8dfd0;
+  --accent:#1a8c6e;--accent2:#2196a8;--soft:#e0f4f0;
+  --text:#1a3a30;--muted:#5a8a7a;
+}
+html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;color:var(--text);overscroll-behavior:none}
+.wrap{max-width:480px;margin:0 auto;padding:env(safe-area-inset-top,16px) 14px env(safe-area-inset-bottom,16px);padding-top:max(env(safe-area-inset-top),16px)}
+
+.header{text-align:center;margin-bottom:12px;padding:14px;background:var(--accent);border-radius:16px}
+.header h1{font-size:18px;font-weight:700;color:#fff;letter-spacing:0.03em}
+.header p{font-size:11px;color:rgba(255,255,255,0.75);margin-top:3px}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px}
+.card-title{font-size:10px;color:var(--muted);margin-bottom:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
+
+.time-row{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:12px}
+.spinner{display:flex;flex-direction:column;align-items:center;gap:4px}
+.spin-label{font-size:11px;color:var(--muted);font-weight:500}
+.spin-val{font-size:38px;font-weight:700;color:var(--accent);line-height:1;min-width:64px;text-align:center}
+.spin-btn{background:var(--soft);border:1px solid var(--border);border-radius:10px;color:var(--accent);cursor:pointer;width:52px;height:32px;font-size:14px;font-weight:700;transition:background 0.1s;user-select:none}
+.spin-btn:active{background:#b8dfd0}
+.colon{font-size:32px;font-weight:700;color:var(--muted);padding-bottom:18px}
+
+.record-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity 0.1s;letter-spacing:0.03em}
+.record-btn:active{opacity:0.8}
+
+.points-row{display:flex;align-items:center;gap:12px}
+.point-circle{position:relative;width:80px;height:80px;flex-shrink:0}
+.point-circle svg{width:100%;height:100%}
+.point-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.point-num .big{font-size:20px;font-weight:700;color:var(--accent);line-height:1}
+.point-num .small{font-size:10px;color:var(--muted)}
+.points-info{flex:1}
+.progress-bar{background:var(--soft);border-radius:100px;height:8px;margin-bottom:6px;overflow:hidden;border:1px solid var(--border)}
+.progress-fill{background:var(--accent);height:100%;border-radius:100px;transition:width 0.5s ease}
+.progress-label{font-size:12px;color:var(--muted)}
+.next-label{font-size:12px;color:var(--accent2);margin-top:4px;font-weight:500}
+
+.history-list{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.hist-item{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--soft);border-radius:8px;font-size:12px}
+.hist-date{color:var(--muted);min-width:62px}
+.hist-time{font-weight:700;color:var(--accent);min-width:38px}
+.hist-bar{flex:1;height:4px;background:rgba(26,140,110,0.15);border-radius:100px;overflow:hidden}
+.hist-bar-fill{height:100%;border-radius:100px;background:var(--accent)}
+.hist-pts{color:var(--accent2);font-weight:700;min-width:34px;text-align:right}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,60,40,0.5);z-index:100;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border:1.5px solid var(--border);border-radius:20px;padding:20px 16px;text-align:center;max-width:320px;width:100%}
+.modal h3{font-size:17px;font-weight:700;color:var(--accent);margin-bottom:4px}
+.modal .sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+
+.roulette-wrap{position:relative;margin:0 auto 14px;width:220px;height:220px}
+.spin-arrow{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:22px;color:var(--accent);z-index:2;line-height:1}
+canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
+
+.modal-btns{display:flex;gap:8px;justify-content:center}
+.spin-roulette-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity 0.1s}
+.spin-roulette-btn:disabled{opacity:0.35;cursor:default}
+.spin-roulette-btn:active{opacity:0.8}
+.close-modal-btn{background:none;border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--text);cursor:pointer;font-family:inherit}
+.close-modal-btn:active{background:var(--soft)}
+.result-box{margin-top:12px;padding:10px 14px;background:var(--soft);border-radius:10px;font-size:15px;font-weight:700;color:var(--accent);border:1px solid var(--border);display:none}
+
+.toast{position:fixed;bottom:max(env(safe-area-inset-bottom),20px);left:50%;transform:translateX(-50%) translateY(80px);background:var(--accent);color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:700;transition:transform 0.3s;z-index:200;pointer-events:none;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+.empty-msg{font-size:13px;color:var(--muted);text-align:center;padding:12px 0}
+
+.reset-btn{width:100%;background:none;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:12px;color:var(--muted);cursor:pointer;font-family:inherit;margin-top:6px}
+.reset-btn:active{background:var(--soft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <h1>睡眠記録 &amp; ご褒美ポイント</h1>
+    <p>目標：6時間 ／ 100ポイントでルーレット</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">今日の睡眠時間を記録</div>
+    <div class="time-row">
+      <div class="spinner">
+        <button class="spin-btn" id="h-up">▲</button>
+        <div class="spin-val" id="h-val">07</div>
+        <button class="spin-btn" id="h-down">▼</button>
+        <div class="spin-label">時間</div>
+      </div>
+      <div class="colon">:</div>
+      <div class="spinner">
+        <button class="spin-btn" id="m-up">▲</button>
+        <div class="spin-val" id="m-val">00</div>
+        <button class="spin-btn" id="m-down">▼</button>
+        <div class="spin-label">分</div>
+      </div>
+    </div>
+    <button class="record-btn" id="record-btn">記録する</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">ご褒美ポイント</div>
+    <div class="points-row">
+      <div class="point-circle">
+        <svg viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="#e0f4f0" stroke-width="7"/>
+          <circle cx="40" cy="40" r="32" fill="none" stroke="#1a8c6e" stroke-width="7"
+            stroke-linecap="round" stroke-dasharray="201" id="point-arc"
+            transform="rotate(-90 40 40)" style="stroke-dashoffset:201;transition:stroke-dashoffset 0.5s"/>
+        </svg>
+        <div class="point-num">
+          <div class="big" id="pts-num">0</div>
+          <div class="small">pt</div>
+        </div>
+      </div>
+      <div class="points-info">
+        <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+        <div class="progress-label" id="prog-label">0 / 100 ポイント</div>
+        <div class="next-label" id="next-label">あと100ptでルーレット</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">記録履歴</div>
+    <div class="history-list" id="history-list">
+      <div class="empty-msg">まだ記録がありません</div>
+    </div>
+    <button class="reset-btn" id="reset-btn">データをリセット</button>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div style="font-size:28px;margin-bottom:6px">🎉</div>
+    <h3>100ポイント達成！</h3>
+    <div class="sub">ルーレットを回してご褒美をGETしよう</div>
+    <div class="roulette-wrap">
+      <div class="spin-arrow">▼</div>
+      <canvas id="roulette" width="220" height="220"></canvas>
+    </div>
+    <div class="modal-btns">
+      <button class="spin-roulette-btn" id="spin-btn">回す</button>
+      <button class="close-modal-btn" id="close-modal">閉じる</button>
+    </div>
+    <div class="result-box" id="result-text"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const GOAL_MINS = 360;
+const N = 6;
+const REWARDS = ['甘いものを食べる','日帰り温泉に行く','県外に遊びに行く','肉を食べる','寿司を食べる','服を買う'];
+const COLORS = ['#2196a8','#1a8c6e','#4caf88','#64b5c4','#38a18c','#5bcfb0'];
+const LS_KEY = 'sleepTrackerData';
+
+let hours = 7, mins = 0;
+let totalPoints = 0;
+let history = [];
+let spinning = false;
+let currentAngle = 0;
+
+function pad(n){return String(n).padStart(2,'0')}
+
+function save(){
+  localStorage.setItem(LS_KEY, JSON.stringify({totalPoints, history, currentAngle}));
+}
+
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(LS_KEY)||'{}');
+    if(d.totalPoints !== undefined) totalPoints = d.totalPoints;
+    if(d.history) history = d.history;
+    if(d.currentAngle !== undefined) currentAngle = d.currentAngle;
+  } catch(e){}
+}
+
+function calcPoints(m){
+  if(m >= GOAL_MINS) return 12;
+  return Math.round((m / GOAL_MINS) * 10);
+}
+
+function updateTimeDisplay(){
+  document.getElementById('h-val').textContent = pad(hours);
+  document.getElementById('m-val').textContent = pad(mins);
+}
+
+function updatePointsDisplay(){
+  const inCycle = totalPoints % 100;
+  document.getElementById('pts-num').textContent = totalPoints;
+  document.getElementById('prog-fill').style.width = inCycle+'%';
+  document.getElementById('prog-label').textContent = inCycle+' / 100 ポイント';
+  document.getElementById('point-arc').style.strokeDashoffset = 201 - (201 * inCycle / 100);
+  if(inCycle === 0 && totalPoints > 0){
+    document.getElementById('next-label').textContent = '達成！ルーレットを回そう';
+  } else {
+    document.getElementById('next-label').textContent = 'あと'+(100-inCycle)+'ptでルーレット';
+  }
+}
+
+function renderHistory(){
+  const el = document.getElementById('history-list');
+  if(!history.length){
+    el.innerHTML = '<div class="empty-msg">まだ記録がありません</div>';
+    return;
+  }
+  el.innerHTML = history.slice().reverse().map(h=>{
+    const pct = Math.min(h.mins/GOAL_MINS,1)*100;
+    const hr = Math.floor(h.mins/60), mn = h.mins%60;
+    return `<div class="hist-item">
+      <span class="hist-date">${h.date}</span>
+      <span class="hist-time">${pad(hr)}:${pad(mn)}</span>
+      <div class="hist-bar"><div class="hist-bar-fill" style="width:${pct}%"></div></div>
+      <span class="hist-pts">+${h.pts}pt</span>
+    </div>`;
+  }).join('');
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+document.getElementById('h-up').addEventListener('click',()=>{hours=(hours+1)%25;updateTimeDisplay()});
+document.getElementById('h-down').addEventListener('click',()=>{hours=(hours-1+25)%25;updateTimeDisplay()});
+document.getElementById('m-up').addEventListener('click',()=>{mins=(mins+5)%60;updateTimeDisplay()});
+document.getElementById('m-down').addEventListener('click',()=>{mins=(mins-5+60)%60;updateTimeDisplay()});
+
+document.getElementById('record-btn').addEventListener('click',()=>{
+  const totalMins = hours*60+mins;
+  if(!totalMins){showToast('睡眠時間を入力してください');return;}
+  const pts = calcPoints(totalMins);
+  const prev = totalPoints;
+  totalPoints += pts;
+  const now = new Date();
+  history.push({
+    date:(now.getMonth()+1)+'/'+(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes()),
+    mins:totalMins, pts
+  });
+  save();
+  updatePointsDisplay();
+  renderHistory();
+  showToast('+'+pts+'ポイント獲得！');
+  if(Math.floor(totalPoints/100) > Math.floor(prev/100)){
+    setTimeout(openModal, 700);
+  }
+});
+
+document.getElementById('reset-btn').addEventListener('click',()=>{
+  if(!confirm('記録とポイントをすべてリセットしますか？')) return;
+  totalPoints = 0; history = []; currentAngle = 0;
+  save();
+  updatePointsDisplay();
+  renderHistory();
+  drawRoulette(0);
+  showToast('リセットしました');
+});
+
+function drawRoulette(angle){
+  const canvas = document.getElementById('roulette');
+  const ctx = canvas.getContext('2d');
+  const cx=110, cy=110, r=104;
+  ctx.clearRect(0,0,220,220);
+  const slice = (Math.PI*2)/N;
+  for(let i=0;i<N;i++){
+    const s = angle+slice*i, e = angle+slice*(i+1);
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,s,e);ctx.closePath();
+    ctx.fillStyle=COLORS[i];ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.6)';ctx.lineWidth=2;ctx.stroke();
+    const mid = angle+slice*i+slice/2;
+    const tx = cx+(r*0.65)*Math.cos(mid), ty = cy+(r*0.65)*Math.sin(mid);
+    ctx.save();ctx.translate(tx,ty);ctx.rotate(mid+Math.PI/2);
+    ctx.fillStyle='#fff';ctx.font='bold 10px -apple-system,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    const label = REWARDS[i];
+    if(label.length>7){
+      const h2=Math.ceil(label.length/2);
+      ctx.fillText(label.slice(0,h2),0,-7);ctx.fillText(label.slice(h2),0,7);
+    } else {ctx.fillText(label,0,0);}
+    ctx.restore();
+  }
+  ctx.beginPath();ctx.arc(cx,cy,15,0,Math.PI*2);
+  ctx.fillStyle='#fff';ctx.fill();
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--border').trim()||'#b8dfd0';
+  ctx.lineWidth=2;ctx.stroke();
+}
+
+function getWinnerIndex(finalAngle){
+  const slice=(Math.PI*2)/N;
+  const TWO_PI=Math.PI*2;
+  let rel=(((-Math.PI/2)-finalAngle)%TWO_PI+TWO_PI)%TWO_PI;
+  return Math.floor(rel/slice)%N;
+}
+
+function openModal(){
+  document.getElementById('modal').classList.add('open');
+  const rt=document.getElementById('result-text');
+  rt.style.display='none';rt.textContent='';
+  document.getElementById('spin-btn').disabled=false;
+  drawRoulette(currentAngle);
+}
+
+document.getElementById('close-modal').addEventListener('click',()=>{
+  document.getElementById('modal').classList.remove('open');
+  if(totalPoints%100!==0){totalPoints=Math.floor(totalPoints/100)*100;save();updatePointsDisplay();}
+});
+
+document.getElementById('spin-btn').addEventListener('click',()=>{
+  if(spinning) return;
+  spinning=true;
+  document.getElementById('spin-btn').disabled=true;
+  const rt=document.getElementById('result-text');
+  rt.style.display='none';
+  const totalRot=Math.PI*2*(6+Math.random()*3)+Math.random()*Math.PI*2;
+  const finalAngle=(currentAngle+totalRot)%(Math.PI*2);
+  let start=null;
+  const dur=4500;
+  function animate(ts){
+    if(!start) start=ts;
+    const p=Math.min((ts-start)/dur,1);
+    const ease=1-Math.pow(1-p,4);
+    drawRoulette(currentAngle+ease*totalRot);
+    if(p<1){requestAnimationFrame(animate);}
+    else{
+      currentAngle=finalAngle;spinning=false;
+      const idx=getWinnerIndex(currentAngle);
+      rt.textContent=REWARDS[idx]+' が当たり！';
+      rt.style.display='block';
+      totalPoints=totalPoints%100;
+      save();updatePointsDisplay();
+    }
+  }
+  requestAnimationFrame(animate);
+});
+
+load();
+updateTimeDisplay();
+updatePointsDisplay();
+renderHistory();
+drawRoulette(currentAngle);
+</script>
+</body>
+</html>
