@@ -256,6 +256,24 @@ window.applyFirestoreRecordsToScreen = function(records) {
   renderHistory();
 };
 
+window.applyAppStateToScreen = function(state) {
+  if (!state) {
+    return;
+  }
+
+  if (typeof state.totalPoints === "number") {
+    totalPoints = state.totalPoints;
+  }
+
+  if (typeof state.currentAngle === "number") {
+    currentAngle = state.currentAngle;
+  }
+
+  save();
+  updatePointsDisplay();
+  drawRoulette(currentAngle);
+};
+
 function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -332,11 +350,19 @@ document.getElementById('record-btn').addEventListener('click', async () => {
     totalPoints += pts;
     history.push(localRecord);
 
-    save();
-    updatePointsDisplay();
-    renderHistory();
+   save();
+updatePointsDisplay();
+renderHistory();
 
-    showToast('+' + pts + 'ポイント獲得！Firestoreにも保存しました');
+if (window.saveAppStateToFirestore) {
+  await window.saveAppStateToFirestore({
+    totalPoints: totalPoints,
+    currentAngle: currentAngle
+  });
+}
+
+showToast('+' + pts + 'ポイント獲得！Firestoreにも保存しました');
+
 
     if (Math.floor(totalPoints/100) > Math.floor(prev/100)) {
       setTimeout(openModal, 700);
@@ -500,9 +526,19 @@ document.getElementById('spin-btn').addEventListener('click',()=>{
       rt.textContent=REWARDS[idx]+' が当たり！';
       rt.style.display='block';
 
-      totalPoints=totalPoints%100;
-      save();
-      updatePointsDisplay();
+      totalPoints = totalPoints % 100;
+save();
+updatePointsDisplay();
+
+if (window.saveAppStateToFirestore) {
+  window.saveAppStateToFirestore({
+    totalPoints: totalPoints,
+    currentAngle: currentAngle
+  }).catch((error) => {
+    console.error("ポイント状態の保存に失敗しました", error);
+  });
+}
+
     }
   }
 
@@ -528,13 +564,16 @@ drawRoulette(currentAngle);
   } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
    import {
-    getFirestore,
-    collection,
-    addDoc,
-    getDocs,
-    deleteDoc,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDTt2VSB6hUH3zGdqtJ8gt2r1L1Vh0R5Xk",
@@ -609,6 +648,39 @@ drawRoulette(currentAngle);
     }));
   }
 
+  async function loadAppStateFromFirestore() {
+  if (!currentUser) {
+    return null;
+  }
+
+  const stateRef = doc(db, "users", currentUser.uid, "app_state", "current");
+  const stateSnap = await getDoc(stateRef);
+
+  if (!stateSnap.exists()) {
+    return null;
+  }
+
+  return stateSnap.data();
+}
+
+window.saveAppStateToFirestore = async (state) => {
+  if (!currentUser) {
+    throw new Error("ログインしていません");
+  }
+
+  const stateRef = doc(db, "users", currentUser.uid, "app_state", "current");
+
+  await setDoc(
+    stateRef,
+    {
+      totalPoints: Number(state.totalPoints) || 0,
+      currentAngle: Number(state.currentAngle) || 0,
+      updated_at: serverTimestamp()
+    },
+    { merge: true }
+  );
+};
+
   loginButton.addEventListener("click", async () => {
     try {
       await signInWithPopup(auth, provider);
@@ -637,18 +709,30 @@ drawRoulette(currentAngle);
       logoutButton.style.display = "inline-block";
 
       try {
-        const records = await Promise.race([
-          loadSleepRecordsFromFirestore(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("履歴読み込みがタイムアウトしました")), 10000)
-          )
-        ]);
+       const result = await Promise.race([
+  Promise.all([
+    loadSleepRecordsFromFirestore(),
+    loadAppStateFromFirestore()
+  ]),
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("履歴読み込みがタイムアウトしました")), 10000)
+  )
+]);
 
-        if (window.applyFirestoreRecordsToScreen) {
-          window.applyFirestoreRecordsToScreen(records);
-        }
+const records = result[0];
+const appState = result[1];
 
-        loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み済み）";
+if (window.applyFirestoreRecordsToScreen) {
+  window.applyFirestoreRecordsToScreen(records);
+}
+
+if (window.applyAppStateToScreen && appState) {
+  window.applyAppStateToScreen(appState);
+}
+
+loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み済み）";
+
+
       } catch (error) {
         console.error(error);
         loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み失敗）";
@@ -702,6 +786,17 @@ window.deleteAllSleepRecordsFromFirestore = async () => {
     });
 
     await Promise.all(deletePromises);
+
+    await setDoc(
+  doc(db, "users", currentUser.uid, "app_state", "current"),
+  {
+    totalPoints: 0,
+    currentAngle: 0,
+    updated_at: serverTimestamp()
+  },
+  { merge: true }
+);
+
   };
 
 </script>
