@@ -96,7 +96,7 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
     <button class="record-btn" id="loginButton">Googleでログイン</button>
     <button class="reset-btn" id="logoutButton" style="display:none;">ログアウト</button>
     <p id="loginStatus" style="font-size:13px;color:#5a8a7a;margin-top:8px;">未ログインです</p>
-    <button class="reset-btn" id="testSaveButton" style="display:none;">テストデータを保存</button>
+    
   </div>
 
   <div class="card">
@@ -660,30 +660,7 @@ drawRoulette(currentAngle);
     );
   };
 
-  testSaveButton.addEventListener("click", async () => {
-    if (!currentUser) {
-      alert("先にログインしてください。");
-      return;
-    }
 
-    try {
-      await addDoc(
-        collection(db, "users", currentUser.uid, "sleep_records"),
-        {
-          record_date: new Date().toISOString().slice(0, 10),
-          sleep_hours: 7,
-          sleep_quality: "テスト",
-          memo: "Firebase接続テスト",
-          created_at: serverTimestamp()
-        }
-      );
-
-      alert("Firestoreにテストデータを保存しました。");
-    } catch (error) {
-      console.error(error);
-      alert("保存に失敗しました: " + error.message);
-    }
-  });
 </script>
 </body>
 </html>
