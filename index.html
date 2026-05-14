@@ -83,6 +83,12 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
 </style>
 </head>
 <body>
+  <div style="padding: 12px; border: 1px solid #ddd; margin-bottom: 16px;">
+  <button id="loginButton">Googleでログイン</button>
+  <button id="logoutButton" style="display:none;">ログアウト</button>
+  <p id="loginStatus">未ログインです</p>
+  <button id="testSaveButton" style="display:none;">テストデータを保存</button>
+  </div>
 <div class="wrap">
 
   <div class="header">
@@ -355,6 +361,103 @@ updateTimeDisplay();
 updatePointsDisplay();
 renderHistory();
 drawRoulette(currentAngle);
+</script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+  // ここをFirebase Consoleに表示されている内容に差し替えます
+  const firebaseConfig = {
+    apiKey: "AIzaSyDTt2VSB6hUH3zGdqtJ8gt2r1L1Vh0R5Xk",
+    authDomain: "sleep-counter-1f8f1.firebaseapp.com",
+    projectId: "sleep-counter-1f8f1",
+    storageBucket: "sleep-counter-1f8f1.firebasestorage.app",
+    messagingSenderId: "469761401426",
+    appId: "1:469761401426:web:efb89071b7d143d7f4758b"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  const loginButton = document.getElementById("loginButton");
+  const logoutButton = document.getElementById("logoutButton");
+  const loginStatus = document.getElementById("loginStatus");
+  const testSaveButton = document.getElementById("testSaveButton");
+
+  let currentUser = null;
+
+  loginButton.addEventListener("click", async () => {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error(error);
+      alert("ログインに失敗しました: " + error.message);
+    }
+  });
+
+  logoutButton.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error(error);
+      alert("ログアウトに失敗しました: " + error.message);
+    }
+  });
+
+  onAuthStateChanged(auth, (user) => {
+    currentUser = user;
+
+    if (user) {
+      loginStatus.textContent = "ログイン中: " + user.email;
+      loginButton.style.display = "none";
+      logoutButton.style.display = "inline-block";
+      testSaveButton.style.display = "inline-block";
+    } else {
+      loginStatus.textContent = "未ログインです";
+      loginButton.style.display = "inline-block";
+      logoutButton.style.display = "none";
+      testSaveButton.style.display = "none";
+    }
+  });
+
+  testSaveButton.addEventListener("click", async () => {
+    if (!currentUser) {
+      alert("先にログインしてください。");
+      return;
+    }
+
+    try {
+      await addDoc(
+        collection(db, "users", currentUser.uid, "sleep_records"),
+        {
+          record_date: new Date().toISOString().slice(0, 10),
+          sleep_hours: 7,
+          sleep_quality: "テスト",
+          memo: "Firebase接続テスト",
+          created_at: serverTimestamp()
+        }
+      );
+
+      alert("Firestoreにテストデータを保存しました。");
+    } catch (error) {
+      console.error(error);
+      alert("保存に失敗しました: " + error.message);
+    }
+  });
 </script>
 </body>
 </html>
