@@ -83,17 +83,18 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
 </style>
 </head>
 <body>
-  <div style="padding: 12px; border: 1px solid #ddd; margin-bottom: 16px;">
-  <button id="loginButton">Googleでログイン</button>
-  <button id="logoutButton" style="display:none;">ログアウト</button>
-  <p id="loginStatus">未ログインです</p>
-  <button id="testSaveButton" style="display:none;">テストデータを保存</button>
-  </div>
 <div class="wrap">
 
   <div class="header">
     <h1>睡眠記録 &amp; ご褒美ポイント</h1>
     <p>目標：6時間 ／ 100ポイントでルーレット</p>
+  </div>
+  <div class="card">
+    <div class="card-title">ログイン状態</div>
+    <button class="record-btn" id="loginButton">Googleでログイン</button>
+    <button class="reset-btn" id="logoutButton" style="display:none;">ログアウト</button>
+    <p id="loginStatus" style="font-size:13px;color:#5a8a7a;margin-top:8px;">未ログインです</p>
+    <button class="reset-btn" id="testSaveButton" style="display:none;">テストデータを保存</button>
   </div>
 
   <div class="card">
