@@ -617,6 +617,45 @@ drawRoulette(currentAngle);
       testSaveButton.style.display = "none";
 
       try {
+        const records = await Promise.race([
+          loadSleepRecordsFromFirestore(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("履歴読み込みがタイムアウトしました")), 10000)
+          )
+        ]);
+
+        if (window.applyFirestoreRecordsToScreen) {
+          window.applyFirestoreRecordsToScreen(records);
+        }
+
+        loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み済み）";
+      } catch (error) {
+        console.error(error);
+        loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み失敗）";
+        alert(
+          "Firestoreから履歴を読み込めませんでした。\n\n" +
+          "エラーコード: " + (error.code || "なし") + "\n" +
+          "内容: " + error.message
+        );
+      }
+
+    } else {
+      loginStatus.textContent = "未ログインです";
+      loginButton.style.display = "inline-block";
+      logoutButton.style.display = "none";
+      testSaveButton.style.display = "none";
+      currentUser = null;
+      window.getCurrentFirebaseUser = () => null;
+    }
+  });
+
+    if (user) {
+      loginStatus.textContent = "ログイン中: " + user.email + "（履歴を読み込み中...）";
+      loginButton.style.display = "none";
+      logoutButton.style.display = "inline-block";
+      testSaveButton.style.display = "none";
+
+      try {
         const records = await loadSleepRecordsFromFirestore();
 
         if (window.applyFirestoreRecordsToScreen) {
