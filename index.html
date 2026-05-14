@@ -369,11 +369,12 @@ const dateInput = document.getElementById('record-date');
 const selectedDate = dateInput && dateInput.value ? dateInput.value : localDateValue(now);
 const displayDate = displayDateFromValue(selectedDate);
 
-  const localRecord = {
-    date: displayDate,
-    mins: totalMins,
-    pts: pts
-  };
+const localRecord = {
+  record_date: selectedDate,
+  date: displayDate,
+  mins: totalMins,
+  pts: pts
+};
 
 const firestoreRecord = {
   record_date: selectedDate,
@@ -390,12 +391,26 @@ const firestoreRecord = {
       throw new Error('Firebase保存処理がまだ準備できていません');
     }
 
-    await window.saveSleepRecordToFirestore(firestoreRecord);
+const saveResult = await window.saveSleepRecordToFirestore(firestoreRecord);
 
-    totalPoints += pts;
-    history.push(localRecord);
+if (saveResult && saveResult.status === "cancelled") {
+  showToast('保存をキャンセルしました');
+  return;
+}
 
-   save();
+// 同じ日付の記録が画面上に残らないように、いったん削除してから追加する
+history = history.filter((record) => {
+  return record.record_date !== selectedDate && record.date !== displayDate;
+});
+
+history.push(localRecord);
+
+// ポイントを履歴から再計算する
+totalPoints = history.reduce((sum, record) => {
+  return sum + (Number(record.pts) || 0);
+}, 0);
+
+save();
 updatePointsDisplay();
 renderHistory();
 
@@ -406,8 +421,11 @@ if (window.saveAppStateToFirestore) {
   });
 }
 
-showToast('+' + pts + 'ポイント獲得！Firestoreにも保存しました');
-
+if (saveResult && saveResult.status === "updated") {
+  showToast('既存の記録を上書きしました');
+} else {
+  showToast('+' + pts + 'ポイント獲得！Firestoreにも保存しました');
+}
 
     if (Math.floor(totalPoints/100) > Math.floor(prev/100)) {
       setTimeout(openModal, 700);
@@ -677,21 +695,22 @@ drawRoulette(currentAngle);
         createdMs = data.created_at.toMillis();
       }
 
-      records.push({
-        date: data.display_date || data.record_date || "",
-        mins: totalMins,
-        pts: pts,
-        createdMs: createdMs
-      });
-    });
+records.push({
+  record_date: data.record_date || "",
+  date: data.display_date || data.record_date || "",
+  mins: totalMins,
+  pts: pts,
+  createdMs: createdMs
+});
 
     records.sort((a, b) => a.createdMs - b.createdMs);
 
-    return records.map((record) => ({
-      date: record.date,
-      mins: record.mins,
-      pts: record.pts
-    }));
+return records.map((record) => ({
+  record_date: record.record_date,
+  date: record.date,
+  mins: record.mins,
+  pts: record.pts
+}));
   }
 
   async function loadAppStateFromFirestore() {
@@ -803,19 +822,60 @@ loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込
     }
   });
 
-  window.saveSleepRecordToFirestore = async (record) => {
-    if (!currentUser) {
-      throw new Error("ログインしていません");
+ window.saveSleepRecordToFirestore = async (record) => {
+  if (!currentUser) {
+    throw new Error("ログインしていません");
+  }
+
+  if (!record.record_date) {
+    throw new Error("記録日が指定されていません");
+  }
+
+  const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
+  const snapshot = await getDocs(recordsRef);
+
+  let existingDocRef = null;
+
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+
+    if (data.record_date === record.record_date) {
+      existingDocRef = docSnap.ref;
+    }
+  });
+
+  if (existingDocRef) {
+    const shouldOverwrite = confirm(
+      record.record_date + " の記録はすでにあります。\n上書きしますか？"
+    );
+
+    if (!shouldOverwrite) {
+      return { status: "cancelled" };
     }
 
-    await addDoc(
-      collection(db, "users", currentUser.uid, "sleep_records"),
+    await setDoc(
+      existingDocRef,
       {
         ...record,
-        created_at: serverTimestamp()
-      }
+        updated_at: serverTimestamp()
+      },
+      { merge: true }
     );
-  };
+
+    return { status: "updated" };
+  }
+
+  await addDoc(
+    recordsRef,
+    {
+      ...record,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    }
+  );
+
+  return { status: "created" };
+};
 
 window.deleteAllSleepRecordsFromFirestore = async () => {
     if (!currentUser) {
