@@ -96,7 +96,6 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
     <button class="record-btn" id="loginButton">Googleでログイン</button>
     <button class="reset-btn" id="logoutButton" style="display:none;">ログアウト</button>
     <p id="loginStatus" style="font-size:13px;color:#5a8a7a;margin-top:8px;">未ログインです</p>
-    
   </div>
 
   <div class="card">
@@ -532,9 +531,9 @@ drawRoulette(currentAngle);
   const loginButton = document.getElementById("loginButton");
   const logoutButton = document.getElementById("logoutButton");
   const loginStatus = document.getElementById("loginStatus");
-  const testSaveButton = document.getElementById("testSaveButton");
 
   let currentUser = null;
+  window.getCurrentFirebaseUser = () => currentUser;
 
   async function loadSleepRecordsFromFirestore() {
     if (!currentUser) {
@@ -614,7 +613,6 @@ drawRoulette(currentAngle);
       loginStatus.textContent = "ログイン中: " + user.email + "（履歴を読み込み中...）";
       loginButton.style.display = "none";
       logoutButton.style.display = "inline-block";
-      testSaveButton.style.display = "none";
 
       try {
         const records = await Promise.race([
@@ -640,50 +638,18 @@ drawRoulette(currentAngle);
       }
 
     } else {
+      currentUser = null;
+      window.getCurrentFirebaseUser = () => null;
+
       loginStatus.textContent = "未ログインです";
       loginButton.style.display = "inline-block";
       logoutButton.style.display = "none";
-      testSaveButton.style.display = "none";
-      currentUser = null;
-      window.getCurrentFirebaseUser = () => null;
-    }
-  });
 
-    if (user) {
-      loginStatus.textContent = "ログイン中: " + user.email + "（履歴を読み込み中...）";
-      loginButton.style.display = "none";
-      logoutButton.style.display = "inline-block";
-      testSaveButton.style.display = "none";
-
-      try {
-        const records = await loadSleepRecordsFromFirestore();
-
-        if (window.applyFirestoreRecordsToScreen) {
-          window.applyFirestoreRecordsToScreen(records);
-        }
-
-        loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み済み）";
-      } catch (error) {
-        console.error(error);
-        loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み失敗）";
-        alert(
-          "Firestoreから履歴を読み込めませんでした。\n\n" +
-          "エラーコード: " + (error.code || "なし") + "\n" +
-          "内容: " + error.message
-        );
+      if (window.applyFirestoreRecordsToScreen) {
+        window.applyFirestoreRecordsToScreen([]);
       }
-
-    } else {
-      loginStatus.textContent = "未ログインです";
-      loginButton.style.display = "inline-block";
-      logoutButton.style.display = "none";
-      testSaveButton.style.display = "none";
-      currentUser = null;
-      window.getCurrentFirebaseUser = () => null;
     }
   });
-
-  window.getCurrentFirebaseUser = () => currentUser;
 
   window.saveSleepRecordToFirestore = async (record) => {
     if (!currentUser) {
@@ -698,8 +664,6 @@ drawRoulette(currentAngle);
       }
     );
   };
-
-
 </script>
 </body>
 </html>
