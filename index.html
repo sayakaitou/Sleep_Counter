@@ -347,21 +347,42 @@ document.getElementById('record-btn').addEventListener('click', async () => {
   }
 });
 
-document.getElementById('reset-btn').addEventListener('click',()=>{
-  if(!confirm('記録とポイントをすべてリセットしますか？')) return;
+document.getElementById('reset-btn').addEventListener('click', async () => {
+  const user = window.getCurrentFirebaseUser ? window.getCurrentFirebaseUser() : null;
 
-  totalPoints = 0;
-  history = [];
-  currentAngle = 0;
+  if (!user) {
+    alert('先にGoogleでログインしてください。');
+    return;
+  }
 
-  save();
-  updatePointsDisplay();
-  renderHistory();
-  drawRoulette(0);
-  showToast('リセットしました');
+  if (!confirm('Firestore上の記録も含めて、すべての睡眠記録とポイントをリセットしますか？')) {
+    return;
+  }
 
-  alert('画面上のデータをリセットしました。Firestore上の過去データ削除は次の段階で対応します。');
+  try {
+    if (!window.deleteAllSleepRecordsFromFirestore) {
+      throw new Error('Firestore削除処理がまだ準備できていません');
+    }
+
+    await window.deleteAllSleepRecordsFromFirestore();
+
+    totalPoints = 0;
+    history = [];
+    currentAngle = 0;
+
+    save();
+    updatePointsDisplay();
+    renderHistory();
+    drawRoulette(0);
+
+    showToast('すべてリセットしました');
+    alert('Firestore上の記録も含めてリセットしました。');
+  } catch (error) {
+    console.error(error);
+    alert('リセットに失敗しました: ' + error.message);
+  }
 });
+
 
 function drawRoulette(angle){
   const canvas = document.getElementById('roulette');
@@ -506,11 +527,12 @@ drawRoulette(currentAngle);
     onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
-  import {
+   import {
     getFirestore,
     collection,
     addDoc,
     getDocs,
+    deleteDoc,
     serverTimestamp
   } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
@@ -664,6 +686,24 @@ drawRoulette(currentAngle);
       }
     );
   };
+
+window.deleteAllSleepRecordsFromFirestore = async () => {
+    if (!currentUser) {
+      throw new Error("ログインしていません");
+    }
+
+    const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
+    const snapshot = await getDocs(recordsRef);
+
+    const deletePromises = [];
+
+    snapshot.forEach((docSnap) => {
+      deletePromises.push(deleteDoc(docSnap.ref));
+    });
+
+    await Promise.all(deletePromises);
+  };
+
 </script>
 </body>
 </html>
