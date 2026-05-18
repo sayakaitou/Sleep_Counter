@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="睡眠記録">
 <title>睡眠記録 &amp; ご褒美</title>
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -23,6 +24,10 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px}
 .card-title{font-size:10px;color:var(--muted);margin-bottom:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
+
+.date-row{margin-bottom:12px}
+.date-label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px}
+.date-input{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;color:var(--text);background:#fff;font-family:inherit}
 
 .time-row{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:12px}
 .spinner{display:flex;flex-direction:column;align-items:center;gap:4px}
@@ -80,28 +85,6 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
 
 .reset-btn{width:100%;background:none;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:12px;color:var(--muted);cursor:pointer;font-family:inherit;margin-top:6px}
 .reset-btn:active{background:var(--soft)}
-
-.date-row{
-  margin-bottom:12px;
-}
-.date-label{
-  display:block;
-  font-size:12px;
-  color:var(--muted);
-  font-weight:700;
-  margin-bottom:6px;
-}
-.date-input{
-  width:100%;
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:10px 12px;
-  font-size:16px;
-  color:var(--text);
-  background:#fff;
-  font-family:inherit;
-}
-
 </style>
 </head>
 
@@ -120,15 +103,15 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
     <p id="loginStatus" style="font-size:13px;color:#5a8a7a;margin-top:8px;">未ログインです</p>
   </div>
 
-<div class="card">
-  <div class="card-title">睡眠時間を記録</div>
+  <div class="card">
+    <div class="card-title">睡眠時間を記録</div>
 
-  <div class="date-row">
-    <label class="date-label" for="record-date">記録する日付</label>
-    <input class="date-input" type="date" id="record-date">
-  </div>
+    <div class="date-row">
+      <label class="date-label" for="record-date">記録する日付</label>
+      <input class="date-input" type="date" id="record-date">
+    </div>
 
-  <div class="time-row">
+    <div class="time-row">
       <div class="spinner">
         <button class="spin-btn" id="h-up">▲</button>
         <div class="spin-val" id="h-val">07</div>
@@ -303,9 +286,7 @@ window.applyFirestoreRecordsToScreen = function(records) {
 };
 
 window.applyAppStateToScreen = function(state) {
-  if (!state) {
-    return;
-  }
+  if (!state) return;
 
   if (typeof state.totalPoints === "number") {
     totalPoints = state.totalPoints;
@@ -364,68 +345,67 @@ document.getElementById('record-btn').addEventListener('click', async () => {
 
   const pts = calcPoints(totalMins);
   const prev = totalPoints;
-const now = new Date();
-const dateInput = document.getElementById('record-date');
-const selectedDate = dateInput && dateInput.value ? dateInput.value : localDateValue(now);
-const displayDate = displayDateFromValue(selectedDate);
+  const now = new Date();
 
-const localRecord = {
-  record_date: selectedDate,
-  date: displayDate,
-  mins: totalMins,
-  pts: pts
-};
+  const dateInput = document.getElementById('record-date');
+  const selectedDate = dateInput && dateInput.value ? dateInput.value : localDateValue(now);
+  const displayDate = displayDateFromValue(selectedDate);
 
-const firestoreRecord = {
-  record_date: selectedDate,
-  display_date: displayDate,
-  hours: hours,
-  minutes: mins,
-  total_minutes: totalMins,
-  sleep_hours: Math.round((totalMins / 60) * 100) / 100,
-  points: pts
-};
+  const localRecord = {
+    record_date: selectedDate,
+    date: displayDate,
+    mins: totalMins,
+    pts: pts
+  };
+
+  const firestoreRecord = {
+    record_date: selectedDate,
+    display_date: displayDate,
+    hours: hours,
+    minutes: mins,
+    total_minutes: totalMins,
+    sleep_hours: Math.round((totalMins / 60) * 100) / 100,
+    points: pts
+  };
 
   try {
     if (!window.saveSleepRecordToFirestore) {
       throw new Error('Firebase保存処理がまだ準備できていません');
     }
 
-const saveResult = await window.saveSleepRecordToFirestore(firestoreRecord);
+    const saveResult = await window.saveSleepRecordToFirestore(firestoreRecord);
 
-if (saveResult && saveResult.status === "cancelled") {
-  showToast('保存をキャンセルしました');
-  return;
-}
+    if (saveResult && saveResult.status === "cancelled") {
+      showToast('保存をキャンセルしました');
+      return;
+    }
 
-// 同じ日付の記録が画面上に残らないように、いったん削除してから追加する
-history = history.filter((record) => {
-  return record.record_date !== selectedDate && record.date !== displayDate;
-});
+    history = history.filter((record) => {
+      return record.record_date !== selectedDate;
+    });
 
-history.push(localRecord);
+    history.push(localRecord);
 
-// ポイントを履歴から再計算する
-totalPoints = history.reduce((sum, record) => {
-  return sum + (Number(record.pts) || 0);
-}, 0);
+    totalPoints = history.reduce((sum, record) => {
+      return sum + (Number(record.pts) || 0);
+    }, 0);
 
-save();
-updatePointsDisplay();
-renderHistory();
+    save();
+    updatePointsDisplay();
+    renderHistory();
 
-if (window.saveAppStateToFirestore) {
-  await window.saveAppStateToFirestore({
-    totalPoints: totalPoints,
-    currentAngle: currentAngle
-  });
-}
+    if (window.saveAppStateToFirestore) {
+      await window.saveAppStateToFirestore({
+        totalPoints: totalPoints,
+        currentAngle: currentAngle
+      });
+    }
 
-if (saveResult && saveResult.status === "updated") {
-  showToast('既存の記録を上書きしました');
-} else {
-  showToast('+' + pts + 'ポイント獲得！Firestoreにも保存しました');
-}
+    if (saveResult && saveResult.status === "updated") {
+      showToast('既存の記録を上書きしました');
+    } else {
+      showToast('+' + pts + 'ポイント獲得！Firestoreにも保存しました');
+    }
 
     if (Math.floor(totalPoints/100) > Math.floor(prev/100)) {
       setTimeout(openModal, 700);
@@ -444,9 +424,7 @@ document.getElementById('reset-btn').addEventListener('click', async () => {
     return;
   }
 
-  if (!confirm('Firestore上の記録も含めて、すべての睡眠記録とポイントをリセットしますか？')) {
-    return;
-  }
+  if(!confirm('Firestore上の記録も含めて、すべての睡眠記録とポイントをリセットしますか？')) return;
 
   try {
     if (!window.deleteAllSleepRecordsFromFirestore) {
@@ -471,7 +449,6 @@ document.getElementById('reset-btn').addEventListener('click', async () => {
     alert('リセットに失敗しました: ' + error.message);
   }
 });
-
 
 function drawRoulette(angle){
   const canvas = document.getElementById('roulette');
@@ -549,12 +526,6 @@ function openModal(){
 
 document.getElementById('close-modal').addEventListener('click',()=>{
   document.getElementById('modal').classList.remove('open');
-
-  if(totalPoints%100!==0){
-    totalPoints=Math.floor(totalPoints/100)*100;
-    save();
-    updatePointsDisplay();
-  }
 });
 
 document.getElementById('spin-btn').addEventListener('click',()=>{
@@ -590,18 +561,18 @@ document.getElementById('spin-btn').addEventListener('click',()=>{
       rt.style.display='block';
 
       totalPoints = totalPoints % 100;
-save();
-updatePointsDisplay();
 
-if (window.saveAppStateToFirestore) {
-  window.saveAppStateToFirestore({
-    totalPoints: totalPoints,
-    currentAngle: currentAngle
-  }).catch((error) => {
-    console.error("ポイント状態の保存に失敗しました", error);
-  });
-}
+      save();
+      updatePointsDisplay();
 
+      if (window.saveAppStateToFirestore) {
+        window.saveAppStateToFirestore({
+          totalPoints: totalPoints,
+          currentAngle: currentAngle
+        }).catch((error) => {
+          console.error("ポイント状態の保存に失敗しました", error);
+        });
+      }
     }
   }
 
@@ -622,22 +593,23 @@ drawRoulette(currentAngle);
   import {
     getAuth,
     GoogleAuthProvider,
-    signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     signOut,
     onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
-   import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    getDocs,
+    deleteDoc,
+    doc,
+    getDoc,
+    setDoc,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDTt2VSB6hUH3zGdqtJ8gt2r1L1Vh0R5Xk",
@@ -661,9 +633,7 @@ drawRoulette(currentAngle);
   window.getCurrentFirebaseUser = () => currentUser;
 
   async function loadSleepRecordsFromFirestore() {
-    if (!currentUser) {
-      return [];
-    }
+    if (!currentUser) return [];
 
     const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
     const snapshot = await getDocs(recordsRef);
@@ -673,17 +643,13 @@ drawRoulette(currentAngle);
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
 
-      if (data.memo === "Firebase接続テスト") {
-        return;
-      }
+      if (data.memo === "Firebase接続テスト") return;
 
       const totalMins =
         Number(data.total_minutes) ||
         Math.round(Number(data.sleep_hours || 0) * 60);
 
-      if (!totalMins) {
-        return;
-      }
+      if (!totalMins) return;
 
       const pts =
         Number(data.points) ||
@@ -695,62 +661,44 @@ drawRoulette(currentAngle);
         createdMs = data.created_at.toMillis();
       }
 
-records.push({
-  record_date: data.record_date || "",
-  date: data.display_date || data.record_date || "",
-  mins: totalMins,
-  pts: pts,
-  createdMs: createdMs
-});
+      records.push({
+        record_date: data.record_date || "",
+        date: data.display_date || data.record_date || "",
+        mins: totalMins,
+        pts: pts,
+        createdMs: createdMs
+      });
+    });
 
     records.sort((a, b) => a.createdMs - b.createdMs);
 
-return records.map((record) => ({
-  record_date: record.record_date,
-  date: record.date,
-  mins: record.mins,
-  pts: record.pts
-}));
+    return records.map((record) => ({
+      record_date: record.record_date,
+      date: record.date,
+      mins: record.mins,
+      pts: record.pts
+    }));
   }
 
   async function loadAppStateFromFirestore() {
-  if (!currentUser) {
-    return null;
+    if (!currentUser) return null;
+
+    const stateRef = doc(db, "users", currentUser.uid, "app_state", "current");
+    const stateSnap = await getDoc(stateRef);
+
+    if (!stateSnap.exists()) return null;
+
+    return stateSnap.data();
   }
-
-  const stateRef = doc(db, "users", currentUser.uid, "app_state", "current");
-  const stateSnap = await getDoc(stateRef);
-
-  if (!stateSnap.exists()) {
-    return null;
-  }
-
-  return stateSnap.data();
-}
-
-window.saveAppStateToFirestore = async (state) => {
-  if (!currentUser) {
-    throw new Error("ログインしていません");
-  }
-
-  const stateRef = doc(db, "users", currentUser.uid, "app_state", "current");
-
-  await setDoc(
-    stateRef,
-    {
-      totalPoints: Number(state.totalPoints) || 0,
-      currentAngle: Number(state.currentAngle) || 0,
-      updated_at: serverTimestamp()
-    },
-    { merge: true }
-  );
-};
 
   loginButton.addEventListener("click", async () => {
+    loginStatus.textContent = "Googleログイン画面へ移動します...";
+
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (error) {
       console.error(error);
+      loginStatus.textContent = "未ログインです";
       alert("ログインに失敗しました: " + error.message);
     }
   });
@@ -764,6 +712,12 @@ window.saveAppStateToFirestore = async (state) => {
     }
   });
 
+  getRedirectResult(auth).catch((error) => {
+    console.error(error);
+    loginStatus.textContent = "未ログインです";
+    alert("Googleログインの戻り処理でエラーが発生しました: " + error.message);
+  });
+
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     window.getCurrentFirebaseUser = () => currentUser;
@@ -774,30 +728,28 @@ window.saveAppStateToFirestore = async (state) => {
       logoutButton.style.display = "inline-block";
 
       try {
-       const result = await Promise.race([
-  Promise.all([
-    loadSleepRecordsFromFirestore(),
-    loadAppStateFromFirestore()
-  ]),
-  new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("履歴読み込みがタイムアウトしました")), 10000)
-  )
-]);
+        const result = await Promise.race([
+          Promise.all([
+            loadSleepRecordsFromFirestore(),
+            loadAppStateFromFirestore()
+          ]),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("履歴読み込みがタイムアウトしました")), 10000)
+          )
+        ]);
 
-const records = result[0];
-const appState = result[1];
+        const records = result[0];
+        const appState = result[1];
 
-if (window.applyFirestoreRecordsToScreen) {
-  window.applyFirestoreRecordsToScreen(records);
-}
+        if (window.applyFirestoreRecordsToScreen) {
+          window.applyFirestoreRecordsToScreen(records);
+        }
 
-if (window.applyAppStateToScreen && appState) {
-  window.applyAppStateToScreen(appState);
-}
+        if (window.applyAppStateToScreen && appState) {
+          window.applyAppStateToScreen(appState);
+        }
 
-loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み済み）";
-
-
+        loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み済み）";
       } catch (error) {
         console.error(error);
         loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込み失敗）";
@@ -822,65 +774,77 @@ loginStatus.textContent = "ログイン中: " + user.email + "（履歴読み込
     }
   });
 
- window.saveSleepRecordToFirestore = async (record) => {
-  if (!currentUser) {
-    throw new Error("ログインしていません");
-  }
+  window.saveSleepRecordToFirestore = async (record) => {
+    if (!currentUser) throw new Error("ログインしていません");
+    if (!record.record_date) throw new Error("記録日が指定されていません");
 
-  if (!record.record_date) {
-    throw new Error("記録日が指定されていません");
-  }
+    const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
+    const snapshot = await getDocs(recordsRef);
 
-  const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
-  const snapshot = await getDocs(recordsRef);
+    const matchingRefs = [];
 
-  let existingDocRef = null;
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
 
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
+      if (data.record_date === record.record_date) {
+        matchingRefs.push(docSnap.ref);
+      }
+    });
 
-    if (data.record_date === record.record_date) {
-      existingDocRef = docSnap.ref;
+    if (matchingRefs.length > 0) {
+      const shouldOverwrite = confirm(
+        record.record_date + " の記録はすでにあります。\n上書きしますか？"
+      );
+
+      if (!shouldOverwrite) {
+        return { status: "cancelled" };
+      }
+
+      await setDoc(
+        matchingRefs[0],
+        {
+          ...record,
+          updated_at: serverTimestamp()
+        },
+        { merge: true }
+      );
+
+      const deletePromises = matchingRefs.slice(1).map((ref) => deleteDoc(ref));
+      await Promise.all(deletePromises);
+
+      return { status: "updated" };
     }
-  });
 
-  if (existingDocRef) {
-    const shouldOverwrite = confirm(
-      record.record_date + " の記録はすでにあります。\n上書きしますか？"
-    );
-
-    if (!shouldOverwrite) {
-      return { status: "cancelled" };
-    }
-
-    await setDoc(
-      existingDocRef,
+    await addDoc(
+      recordsRef,
       {
         ...record,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      }
+    );
+
+    return { status: "created" };
+  };
+
+  window.saveAppStateToFirestore = async (state) => {
+    if (!currentUser) throw new Error("ログインしていません");
+
+    const stateRef = doc(db, "users", currentUser.uid, "app_state", "current");
+
+    await setDoc(
+      stateRef,
+      {
+        totalPoints: Number(state.totalPoints) || 0,
+        currentAngle: Number(state.currentAngle) || 0,
         updated_at: serverTimestamp()
       },
       { merge: true }
     );
+  };
 
-    return { status: "updated" };
-  }
-
-  await addDoc(
-    recordsRef,
-    {
-      ...record,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp()
-    }
-  );
-
-  return { status: "created" };
-};
-
-window.deleteAllSleepRecordsFromFirestore = async () => {
-    if (!currentUser) {
-      throw new Error("ログインしていません");
-    }
+  window.deleteAllSleepRecordsFromFirestore = async () => {
+    if (!currentUser) throw new Error("ログインしていません");
 
     const recordsRef = collection(db, "users", currentUser.uid, "sleep_records");
     const snapshot = await getDocs(recordsRef);
@@ -894,17 +858,15 @@ window.deleteAllSleepRecordsFromFirestore = async () => {
     await Promise.all(deletePromises);
 
     await setDoc(
-  doc(db, "users", currentUser.uid, "app_state", "current"),
-  {
-    totalPoints: 0,
-    currentAngle: 0,
-    updated_at: serverTimestamp()
-  },
-  { merge: true }
-);
-
+      doc(db, "users", currentUser.uid, "app_state", "current"),
+      {
+        totalPoints: 0,
+        currentAngle: 0,
+        updated_at: serverTimestamp()
+      },
+      { merge: true }
+    );
   };
-
 </script>
 </body>
 </html>
