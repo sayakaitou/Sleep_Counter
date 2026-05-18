@@ -51,6 +51,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 .progress-fill{background:var(--accent);height:100%;border-radius:100px;transition:width 0.5s ease}
 .progress-label{font-size:12px;color:var(--muted)}
 .next-label{font-size:12px;color:var(--accent2);margin-top:4px;font-weight:500}
+.reward-edit-btn{margin-top:12px}
 
 .history-list{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .hist-item{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--soft);border-radius:8px;font-size:12px}
@@ -62,7 +63,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,60,40,0.5);z-index:100;align-items:center;justify-content:center;padding:16px}
 .modal-overlay.open{display:flex}
-.modal{background:#fff;border:1.5px solid var(--border);border-radius:20px;padding:20px 16px;text-align:center;max-width:320px;width:100%}
+.modal{background:#fff;border:1.5px solid var(--border);border-radius:20px;padding:20px 16px;text-align:center;max-width:320px;width:100%;max-height:90vh;overflow-y:auto}
 .modal h3{font-size:17px;font-weight:700;color:var(--accent);margin-bottom:4px}
 .modal .sub{font-size:12px;color:var(--muted);margin-bottom:14px}
 
@@ -77,6 +78,10 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
 .close-modal-btn{background:none;border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--text);cursor:pointer;font-family:inherit}
 .close-modal-btn:active{background:var(--soft)}
 .result-box{margin-top:12px;padding:10px 14px;background:var(--soft);border-radius:10px;font-size:15px;font-weight:700;color:var(--accent);border:1px solid var(--border);display:none}
+
+.reward-input-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.reward-input{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--text);background:#fff;font-family:inherit}
+.reward-note{font-size:12px;color:var(--muted);line-height:1.5;text-align:left;background:var(--soft);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:12px}
 
 .toast{position:fixed;bottom:max(env(safe-area-inset-bottom),20px);left:50%;transform:translateX(-50%) translateY(80px);background:var(--accent);color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:700;transition:transform 0.3s;z-index:200;pointer-events:none;white-space:nowrap}
 .toast.show{transform:translateX(-50%) translateY(0)}
@@ -150,6 +155,7 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
         <div class="next-label" id="next-label">あと100ptでルーレット</div>
       </div>
     </div>
+    <button class="reset-btn reward-edit-btn" id="edit-rewards-btn">ご褒美を編集する</button>
   </div>
 
   <div class="card">
@@ -179,15 +185,37 @@ canvas#roulette{border-radius:50%;display:block;border:3px solid var(--border)}
   </div>
 </div>
 
+<div class="modal-overlay" id="reward-modal">
+  <div class="modal">
+    <h3>ご褒美を編集</h3>
+    <div class="sub">最大6つまで登録できます</div>
+    <div class="reward-note">
+      空欄は登録されません。最低1つは入力してください。保存するとルーレットにも反映されます。
+    </div>
+    <div class="reward-input-list" id="reward-input-list">
+      <input class="reward-input" type="text" maxlength="30" placeholder="ご褒美1">
+      <input class="reward-input" type="text" maxlength="30" placeholder="ご褒美2">
+      <input class="reward-input" type="text" maxlength="30" placeholder="ご褒美3">
+      <input class="reward-input" type="text" maxlength="30" placeholder="ご褒美4">
+      <input class="reward-input" type="text" maxlength="30" placeholder="ご褒美5">
+      <input class="reward-input" type="text" maxlength="30" placeholder="ご褒美6">
+    </div>
+    <div class="modal-btns">
+      <button class="spin-roulette-btn" id="save-rewards-btn">保存</button>
+      <button class="close-modal-btn" id="close-reward-modal">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 const GOAL_MINS = 360;
-const N = 6;
-const REWARDS = ['甘いものを食べる','日帰り温泉に行く','県外に遊びに行く','肉を食べる','寿司を食べる','服を買う'];
+const DEFAULT_REWARDS = ['甘いものを食べる','日帰り温泉に行く','県外に遊びに行く','肉を食べる','寿司を食べる','服を買う'];
 const COLORS = ['#2196a8','#1a8c6e','#4caf88','#64b5c4','#38a18c','#5bcfb0'];
 const LS_KEY = 'sleepTrackerData';
 
+let rewards = [...DEFAULT_REWARDS];
 let hours = 7, mins = 0;
 let totalPoints = 0;
 let history = [];
@@ -214,8 +242,16 @@ function setDefaultRecordDate(){
   }
 }
 
+function normalizeRewards(list){
+  const cleaned = Array.isArray(list)
+    ? list.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 6)
+    : [];
+
+  return cleaned.length ? cleaned : [...DEFAULT_REWARDS];
+}
+
 function save(){
-  localStorage.setItem(LS_KEY, JSON.stringify({totalPoints, history, currentAngle}));
+  localStorage.setItem(LS_KEY, JSON.stringify({totalPoints, history, currentAngle, rewards}));
 }
 
 function load(){
@@ -224,6 +260,7 @@ function load(){
     if(d.totalPoints !== undefined) totalPoints = d.totalPoints;
     if(d.history) history = d.history;
     if(d.currentAngle !== undefined) currentAngle = d.currentAngle;
+    if(d.rewards) rewards = normalizeRewards(d.rewards);
   } catch(e){}
 }
 
@@ -296,6 +333,10 @@ window.applyAppStateToScreen = function(state) {
     currentAngle = state.currentAngle;
   }
 
+  if (Array.isArray(state.rewards)) {
+    rewards = normalizeRewards(state.rewards);
+  }
+
   save();
   updatePointsDisplay();
   drawRoulette(currentAngle);
@@ -306,6 +347,22 @@ function showToast(msg){
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+function fillRewardInputs(){
+  const inputs = document.querySelectorAll('.reward-input');
+  inputs.forEach((input, index) => {
+    input.value = rewards[index] || '';
+  });
+}
+
+function openRewardModal(){
+  fillRewardInputs();
+  document.getElementById('reward-modal').classList.add('open');
+}
+
+function closeRewardModal(){
+  document.getElementById('reward-modal').classList.remove('open');
 }
 
 document.getElementById('h-up').addEventListener('click',()=>{
@@ -326,6 +383,54 @@ document.getElementById('m-up').addEventListener('click',()=>{
 document.getElementById('m-down').addEventListener('click',()=>{
   mins=(mins-5+60)%60;
   updateTimeDisplay();
+});
+
+document.getElementById('edit-rewards-btn').addEventListener('click',()=>{
+  const user = window.getCurrentFirebaseUser ? window.getCurrentFirebaseUser() : null;
+  if (!user) {
+    alert('先にGoogleでログインしてください。');
+    return;
+  }
+  openRewardModal();
+});
+
+document.getElementById('close-reward-modal').addEventListener('click',()=>{
+  closeRewardModal();
+});
+
+document.getElementById('save-rewards-btn').addEventListener('click', async ()=>{
+  const user = window.getCurrentFirebaseUser ? window.getCurrentFirebaseUser() : null;
+  if (!user) {
+    alert('先にGoogleでログインしてください。');
+    return;
+  }
+
+  const inputs = Array.from(document.querySelectorAll('.reward-input'));
+  const newRewards = normalizeRewards(inputs.map((input) => input.value));
+
+  if (!newRewards.length) {
+    alert('ご褒美を最低1つ入力してください。');
+    return;
+  }
+
+  rewards = newRewards;
+  save();
+  drawRoulette(currentAngle);
+
+  try {
+    if (window.saveAppStateToFirestore) {
+      await window.saveAppStateToFirestore({
+        totalPoints: totalPoints,
+        currentAngle: currentAngle,
+        rewards: rewards
+      });
+    }
+    closeRewardModal();
+    showToast('ご褒美を保存しました');
+  } catch (error) {
+    console.error(error);
+    alert('ご褒美の保存に失敗しました: ' + error.message);
+  }
 });
 
 document.getElementById('record-btn').addEventListener('click', async () => {
@@ -397,7 +502,8 @@ document.getElementById('record-btn').addEventListener('click', async () => {
     if (window.saveAppStateToFirestore) {
       await window.saveAppStateToFirestore({
         totalPoints: totalPoints,
-        currentAngle: currentAngle
+        currentAngle: currentAngle,
+        rewards: rewards
       });
     }
 
@@ -456,9 +562,10 @@ function drawRoulette(angle){
   const cx=110, cy=110, r=104;
   ctx.clearRect(0,0,220,220);
 
-  const slice = (Math.PI*2)/N;
+  const count = Math.max(1, Math.min(rewards.length, 6));
+  const slice = (Math.PI*2)/count;
 
-  for(let i=0;i<N;i++){
+  for(let i=0;i<count;i++){
     const s = angle+slice*i;
     const e = angle+slice*(i+1);
 
@@ -466,7 +573,7 @@ function drawRoulette(angle){
     ctx.moveTo(cx,cy);
     ctx.arc(cx,cy,r,s,e);
     ctx.closePath();
-    ctx.fillStyle=COLORS[i];
+    ctx.fillStyle=COLORS[i % COLORS.length];
     ctx.fill();
     ctx.strokeStyle='rgba(255,255,255,0.6)';
     ctx.lineWidth=2;
@@ -484,7 +591,7 @@ function drawRoulette(angle){
     ctx.textAlign='center';
     ctx.textBaseline='middle';
 
-    const label = REWARDS[i];
+    const label = rewards[i] || 'ご褒美';
 
     if(label.length>7){
       const h2=Math.ceil(label.length/2);
@@ -507,10 +614,11 @@ function drawRoulette(angle){
 }
 
 function getWinnerIndex(finalAngle){
-  const slice=(Math.PI*2)/N;
+  const count = Math.max(1, Math.min(rewards.length, 6));
+  const slice=(Math.PI*2)/count;
   const TWO_PI=Math.PI*2;
   let rel=(((-Math.PI/2)-finalAngle)%TWO_PI+TWO_PI)%TWO_PI;
-  return Math.floor(rel/slice)%N;
+  return Math.floor(rel/slice)%count;
 }
 
 function openModal(){
@@ -557,7 +665,7 @@ document.getElementById('spin-btn').addEventListener('click',()=>{
       spinning=false;
 
       const idx=getWinnerIndex(currentAngle);
-      rt.textContent=REWARDS[idx]+' が当たり！';
+      rt.textContent=(rewards[idx] || 'ご褒美')+' が当たり！';
       rt.style.display='block';
 
       totalPoints = totalPoints % 100;
@@ -568,9 +676,10 @@ document.getElementById('spin-btn').addEventListener('click',()=>{
       if (window.saveAppStateToFirestore) {
         window.saveAppStateToFirestore({
           totalPoints: totalPoints,
-          currentAngle: currentAngle
+          currentAngle: currentAngle,
+          rewards: rewards
         }).catch((error) => {
-          console.error("ポイント状態の保存に失敗しました", error);
+          console.error('ポイント状態の保存に失敗しました', error);
         });
       }
     }
@@ -832,15 +941,17 @@ drawRoulette(currentAngle);
 
     const stateRef = doc(db, "users", currentUser.uid, "app_state", "current");
 
-    await setDoc(
-      stateRef,
-      {
-        totalPoints: Number(state.totalPoints) || 0,
-        currentAngle: Number(state.currentAngle) || 0,
-        updated_at: serverTimestamp()
-      },
-      { merge: true }
-    );
+    const payload = {
+      totalPoints: Number(state.totalPoints) || 0,
+      currentAngle: Number(state.currentAngle) || 0,
+      updated_at: serverTimestamp()
+    };
+
+    if (Array.isArray(state.rewards)) {
+      payload.rewards = state.rewards.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 6);
+    }
+
+    await setDoc(stateRef, payload, { merge: true });
   };
 
   window.deleteAllSleepRecordsFromFirestore = async () => {
@@ -862,6 +973,7 @@ drawRoulette(currentAngle);
       {
         totalPoints: 0,
         currentAngle: 0,
+        rewards: rewards,
         updated_at: serverTimestamp()
       },
       { merge: true }
