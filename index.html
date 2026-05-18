@@ -720,13 +720,12 @@ drawRoulette(currentAngle);
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
 
   import {
-    getAuth,
-    GoogleAuthProvider,
-    signInWithRedirect,
-    getRedirectResult,
-    signOut,
-    onAuthStateChanged
-  } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
   import {
     getFirestore,
@@ -820,17 +819,21 @@ drawRoulette(currentAngle);
     return stateSnap.data();
   }
 
-  loginButton.addEventListener("click", async () => {
-    loginStatus.textContent = "Googleログイン画面へ移動します...";
+ loginButton.addEventListener("click", async () => {
+  loginStatus.textContent = "Googleログイン画面を開きます...";
 
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch (error) {
-      console.error(error);
-      loginStatus.textContent = "未ログインです";
-      alert("ログインに失敗しました: " + error.message);
-    }
-  });
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    console.error(error);
+    loginStatus.textContent = "未ログインです";
+    alert(
+      "ログインに失敗しました。\n\n" +
+      "エラーコード: " + (error.code || "なし") + "\n" +
+      "内容: " + error.message
+    );
+  }
+});
 
   logoutButton.addEventListener("click", async () => {
     try {
@@ -841,11 +844,7 @@ drawRoulette(currentAngle);
     }
   });
 
-  getRedirectResult(auth).catch((error) => {
-    console.error(error);
-    loginStatus.textContent = "未ログインです";
-    alert("Googleログインの戻り処理でエラーが発生しました: " + error.message);
-  });
+ 
 
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
